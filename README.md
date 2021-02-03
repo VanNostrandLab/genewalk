@@ -128,6 +128,109 @@ optional arguments:
 
 ```
 
+## Using GeneWalk on High Performance Computer Cluster (HPCC)
+Once installed, GeneWalk can be run from the command line as `genewalk-hpc` 
+inside the installation directory or using its relative or absolute path 
+outside of the installation directory with a set of required and optional 
+arguments. The required arguments include the project name, a path to a text 
+file containing a list of genes, an argument specifying the types of genes in 
+the file, and a name for the job scheduler for your HPCC.
+
+```
+genewalk [-h] [--version] --project PROJECT --genes GENES --id_type
+              {hgnc_symbol,hgnc_id,mgi_id,ensembl_id}
+              [--stage {all,node_vectors,null_distribution,statistics}]
+              [--base_folder BASE_FOLDER]
+              [--network_source {pc,indra,edge_list,sif}]
+              [--network_file NETWORK_FILE] [--nproc NPROC] [--nreps NREPS]
+              [--alpha_fdr ALPHA_FDR] [--save_dw SAVE_DW]
+              [--random_seed RANDOM_SEED] 
+
+              [--scheduler SCHEDULER] [--hours HOURS] [--memory MEMORY]
+              [--jobname JOBNAME] [--email EMAIL]
+
+
+required arguments:
+  --version             Print the version of GeneWalk and exit.
+  --project PROJECT     A name for the project which determines the folder
+                        within the base folder in which the intermediate and
+                        final results are written. Must contain only
+                        characters that are valid in folder names.
+  --genes GENES         Path to a text file with a list of differentially
+                        expressed genes. Thetype of gene identifiers used in
+                        the text file are provided in the id_type argument.
+  --id_type {hgnc_symbol,hgnc_id,ensembl_id,mgi_id,entrez_human,entrez_mouse}
+                        The type of gene IDs provided in the text file in the
+                        genes argument. Possible values are: hgnc_symbol,
+                        hgnc_id, ensembl_id, mgi_id, entrez_human and
+                        entrez_mouse.
+
+optional arguments:
+  --stage {all,node_vectors,null_distribution,statistics,visual}
+                        The stage of processing to run. Default: all
+  --base_folder BASE_FOLDER
+                        The base folder used to store GeneWalk temporary and
+                        result files for a given project. Default:
+                        ~/genewalk
+  --network_source {pc,indra,edge_list,sif}
+                        The source of the network to be used.Possible values
+                        are: pc, indra, edge_list, and sif. In case of indra,
+                        edge_list, and sif, the network_file argument must be
+                        specified. Default: pc
+  --network_file NETWORK_FILE
+                        If network_source is indra, this argument points to a
+                        Python pickle file in which a list of INDRA Statements
+                        constituting the network is contained. In case
+                        network_source is edge_list or sif, the network_file
+                        argument points to a text file representing the
+                        network.
+  --nproc NPROC         The number of processors to use in a multiprocessing
+                        environment. Default: 1
+  --nreps_graph NREPS_GRAPH
+                        The number of repeats to run when calculating node
+                        vectors on the GeneWalk graph. Default: 3
+  --nreps_null NREPS_NULL
+                        The number of repeats to run when calculating node
+                        vectors on the random network graphs for constructing
+                        the null distribution. Default: 3
+  --alpha_fdr ALPHA_FDR
+                        The false discovery rate to use when outputting the
+                        final statistics table. If 1 (default), all
+                        similarities are output, otherwise only the ones whose
+                        false discovery rate are below this parameter are
+                        included. Default: 1 
+                        For visualization a default value of 0.1 for both global
+                        and gene-specific plots is used. Lower this value to 
+                        increase the stringency of the regulator gene selection 
+                        procedure.
+  --dim_rep DIM_REP     Dimension of vector representations (embeddings). This 
+                        value should only be increased if genewalk with the 
+                        default value generates no statistically significant 
+                        results, for instance with very large (>2500) input 
+                        gene lists. Alternatively, it can be decreased in case 
+                        (nearly) all GO annotations are significant, for 
+                        instance with very short gene lists. Default: 8
+  --save_dw SAVE_DW     If True, the full DeepWalk object for each repeat is
+                        saved in the project folder. This can be useful for
+                        debugging but the files are typically very large.
+                        Default: False
+  --random_seed RANDOM_SEED
+                        If provided, the random number generator is seeded
+                        with the given value. This should only be used if the
+                        goal is to deterministically reproduce a prior result
+                        obtained with the same random seed.
+
+  --scheduler SCHEDULER
+                        Name of the scheduler on your cluster, e.g., PBS (or QSUB) 
+                        or SBATCH (or SLURM), case insensitive.
+  --jobname JOBNAME     Name of your job, default: GeneWalk
+  --email EMAIL         Email address for notifying you the start, end, and abort 
+                        of you job.
+  --hours HOURS         Time (in integer hours) for running your job, default: 12.
+  --memory MEMORY       Amount of memory (in GB) for all cores needed for your job, 
+                        default: 32.
+
+```
 
 ### Output files
 GeneWalk automatically creates a `genewalk` folder in the user's home folder
