@@ -5,6 +5,7 @@ import pickle
 import random
 import logging
 import argparse
+import subprocess
 import numpy as np
 import pandas as pd
 from genewalk import __version__
@@ -141,9 +142,25 @@ def main():
                              'be used if the goal is to deterministically '
                              'reproduce a prior result obtained with the same '
                              'random seed.')
-
+    parser.add_argument('--scheduler', type=str,
+                        help='Name of the scheduler on your cluster, '
+                             'e.g., PBS (or QSUB) or SBATCH (or SLURM), case insensitive.')
+    parser.add_argument('--jobname', type=str,
+                        help="Name of your job, default: GeneWalk",
+                        default='GeneWalk')
+    parser.add_argument('--email', type=str,
+                        help='Email address for notifying you the start, end, and abort of you job.')
+    parser.add_argument('--hours', type=int,
+                        help='Time (in integer hours) for running your job, default: 12.',
+                        default=12)
+    parser.add_argument('--memory', type=int, dest='memory',
+                        help='Amount of memory (in GB) for all cores needed for your job, default: 32.',
+                        default=32)
     args = parser.parse_args()
-    run_main(args)
+    if args.schedule:
+        data = {k: v for k, v in args.items() if v}
+    else:
+        run_main(args)
 
 
 def run_main(args):
@@ -233,6 +250,81 @@ def run_main(args):
         create_folder(figure_folder, 'barplots')
         GWp = GW_Plotter(figure_folder, dGW, args.alpha_fdr)
         GWp.generate_plots()
+
+
+def schedule(data):
+    sbatch = """#!/usr/bin/env bash
+
+#SBATCH -n {cores}                  # Number of cores (-n)
+#SBATCH -N 1                        # Ensure that all cores are on one Node (-N)
+#SBATCH -t {runtime}                # Runtime in D-HH:MM, minimum of 10 minutes
+#SBATCH --mem={memory}G             # Memory pool for all cores (see also --mem-per-cpu)
+#SBATCH --job-name={jobname}        # Short name for the job
+"""
+    sbatch_email = """
+#SBATCH --mail-user={email}
+#SBATCH --mail-type=ALL
+"""
+    pbs = """ #!/usr/bin/env bash
+
+#PBS -l nodes=1:ppn={cores}
+#PBS -l walltime={runtime}
+#PBS -l vmem={memory}gb
+#PBS -j oe
+#PBS -N {jobname}
+"""
+    pbs_email = """
+#PBS -M {email}
+#PBS -m abe
+"""
+    code = r"""
+export TMPDIR={tmpdir}
+export TEMP={tmpdir}
+export TMP={tmpdir}
+
+echo [$(date +"%m-%d-%Y %H:%M:%S")] "Chimeras start."
+source ENVIRONMENT
+
+{cmd}
+echo [$(date +"%m-%d-%Y %H:%M:%S")] "Chimeras complete."
+"""
+    keys = ('scheduler', 'nproc', 'memory', 'hours', 'jobname', 'email', 'base_folder')
+    scheduler, cores, memory, hours, jobname, email, outdir = [data[key] for key in keys] 
+    if scheduler.upper() in ('PBS', 'QSUB'):
+        runtime, directive, exe, mail = f'{hours}:00:00', pbs, 'qsub', pbs_email
+    elif scheduler.upper() in ('SLURM', 'SBATCH'):
+        days, hours = divmod(hours, 24)
+        runtime, directive, exe, mail = f'{days}-{hours:02}:00', sbatch, 'sbatch', sbatch_email
+    else:
+        raise ValueError(f'Unsupported scheduler: {scheduler}, see help for supported schedulers.')
+    if not os.path.isdir(outdir):
+        os.mkdir(outdir)
+    tmpdir = os.path.join(outdir, 'tmp')
+    if not os.path.isdir(tmpdir):
+        os.mkdir(tmpdir)
+    text = ''.join([directive, mail]) if email else directive
+    text = text.format(**data)
+    keys = ('scheduler', 'memory', 'hours', 'jobname', 'email')
+    data = {k: v for k, v in data.items() if k not in keys and v}
+    cmd = ['genewalk']
+    for k, v in data.items():
+        cmd.append(f'{k} {v}')
+    cmd = ' \\\n    '.join(cmd)
+    code = code.format(tmpdir, cmd)
+    text = text + code
+    
+    submitter = os.path.join(outdir, 'submit.sh')
+    with open(submitter, 'w') as o:
+        o.write(text)
+    
+    print(f'Job submit script was saved to {submitter}')
+    subprocess.run([exe, submitter], cwd=outdir)
+    print(f'Job {jobname} was successfully submitted with the following settings:')
+    data = {'Job name:': jobname, 'Output directory:': os.getcwd(),
+            'Number of cores:': cores, 'Job memory:': memory,
+            'Job runtime:': f'{runtime} (D-HH:MM)'}
+    for k, v in data.items():
+        print(f'{k:>20} {v}')
 
 
 if __name__ == '__main__':
